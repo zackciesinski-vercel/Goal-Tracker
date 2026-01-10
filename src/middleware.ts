@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Routes that require authentication (everything else is public)
+const protectedRoutes = [
+  '/settings',
+]
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -31,21 +36,25 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect all routes except login and auth callback
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
+  const pathname = request.nextUrl.pathname
+
+  // Check if route is explicitly protected
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+
+  // Redirect unauthenticated users from protected routes to login
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }
 
   // Redirect logged-in users away from login page
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  if (user && pathname.startsWith('/login')) {
+    const redirect = request.nextUrl.searchParams.get('redirect') || '/'
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = redirect
+    url.searchParams.delete('redirect')
     return NextResponse.redirect(url)
   }
 

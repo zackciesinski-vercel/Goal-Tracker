@@ -5,40 +5,82 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getCurrentFiscalPeriod, getQuarterLabel } from '@/lib/fiscal'
 import { calculateProgress, getGoalStatus, getStatusLabel, formatMetric } from '@/lib/goals'
+import { demoCompanyObjectives, demoTeamGoals, demoOrgSettings } from '@/lib/demo-data'
+import { GuestBanner } from '@/components/guest-banner'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // Get org settings
-  const { data: settings } = await supabase
-    .from('org_settings')
-    .select('*')
-    .single()
-
-  const fiscalStartMonth = settings?.fiscal_year_start_month ?? 2
-  const checkinCadence = settings?.checkin_cadence_days ?? 7
-  const currentPeriod = getCurrentFiscalPeriod(fiscalStartMonth)
-
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get all goals with their updates for current quarter
-  const { data: goals } = await supabase
-    .from('goals')
-    .select(`
-      *,
-      updates (*)
-    `)
-    .eq('year', currentPeriod.year)
-    .eq('quarter', currentPeriod.quarter)
-    .order('created_at', { ascending: false })
+  // For guests or users without org, use demo data
+  let fiscalStartMonth = demoOrgSettings.fiscal_year_start_month
+  let checkinCadence = demoOrgSettings.checkin_cadence_days
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let allGoals: any[] = [...demoCompanyObjectives, ...demoTeamGoals]
+  let isGuest = !user
+  let hasOrg = false
+
+  if (user) {
+    // Get user's organization - use try/catch to handle RLS errors gracefully
+    try {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (membership?.organization_id) {
+        hasOrg = true
+        const orgId = membership.organization_id
+
+        // Get org settings
+        const { data: orgSettings } = await supabase
+          .from('org_settings')
+          .select('*')
+          .eq('organization_id', orgId)
+          .maybeSingle()
+
+        if (orgSettings) {
+          fiscalStartMonth = orgSettings.fiscal_year_start_month
+          checkinCadence = orgSettings.checkin_cadence_days
+        }
+
+        // Get goals for this organization
+        const period = getCurrentFiscalPeriod(fiscalStartMonth)
+        const { data: orgGoals } = await supabase
+          .from('goals')
+          .select(`
+            *,
+            updates (*)
+          `)
+          .eq('organization_id', orgId)
+          .eq('year', period.year)
+          .eq('quarter', period.quarter)
+          .order('created_at', { ascending: false })
+
+        allGoals = orgGoals ?? []
+      }
+    } catch {
+      // If any query fails, fall back to demo data
+      console.error('Failed to fetch org data, using demo data')
+    }
+  }
+
+  // Treat users without an org like guests (show demo data)
+  isGuest = !user || !hasOrg
+
+  const currentPeriod = getCurrentFiscalPeriod(fiscalStartMonth)
 
   // Separate goals by type
-  const companyObjectives = goals?.filter(g => g.goal_type === 'company') ?? []
-  const myGoals = goals?.filter(
-    g => (g.goal_type === 'team' || g.goal_type === 'individual') && g.owner_id === user?.id
-  ) ?? []
+  const companyObjectives = allGoals?.filter(g => g.goal_type === 'company') ?? []
+  const myGoals = isGuest
+    ? allGoals?.filter(g => g.goal_type === 'team' || g.goal_type === 'individual') ?? []
+    : allGoals?.filter(
+        g => (g.goal_type === 'team' || g.goal_type === 'individual') && g.owner_id === user?.id
+      ) ?? []
 
   const hasCompanyObjectives = companyObjectives.length > 0
   const hasMyGoals = myGoals.length > 0
@@ -46,8 +88,10 @@ export default async function DashboardPage() {
   const circumference = 2 * Math.PI * 45
 
   return (
-    <AppShell>
+    <AppShell isGuest={isGuest}>
       <div className="space-y-8">
+        {isGuest && <GuestBanner />}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -73,7 +117,7 @@ export default async function DashboardPage() {
                 const strokeDashoffset = circumference - (progress / 100) * circumference
 
                 // Count goals that ladder up to this objective
-                const childGoals = goals?.filter(g => g.parent_goal_id === objective.id) ?? []
+                const childGoals = allGoals?.filter(g => g.parent_goal_id === objective.id) ?? []
                 const childCount = childGoals.length
 
                 const statusTextColors = {

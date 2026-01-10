@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { THEME_PRESETS, FONT_OPTIONS, getThemeById, getFontById, STATUS_COLORS, type ThemeColors } from '@/lib/themes'
+import { THEME_PRESETS, FONT_OPTIONS, getThemeById, getFontById, STATUS_COLORS, type ThemeColors, type ThemePreset } from '@/lib/themes'
 
 type ColorMode = 'light' | 'dark' | 'system'
 
@@ -25,7 +25,9 @@ type ThemeContextType = {
   resolvedMode: 'light' | 'dark'
   themePreset: string
   fontFamily: string
+  customTheme: ThemePreset | null
   updatePreferences: (updates: Partial<UserPreferences>) => Promise<void>
+  setCustomTheme: (theme: ThemePreset) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -75,8 +77,22 @@ export function ThemeProvider({
   const [preferences, setPreferences] = useState<UserPreferences | null>(initialPreferences ?? null)
   const [isLoading, setIsLoading] = useState(!initialPreferences)
   const [systemMode, setSystemMode] = useState<'light' | 'dark'>('light')
+  const [customTheme, setCustomThemeState] = useState<ThemePreset | null>(null)
 
   const supabase = createClient()
+
+  // Load custom theme from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = localStorage.getItem('custom-cloned-theme')
+    if (saved) {
+      try {
+        setCustomThemeState(JSON.parse(saved))
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [])
 
   // Listen to system color scheme changes
   useEffect(() => {
@@ -131,7 +147,10 @@ export function ThemeProvider({
     if (typeof window === 'undefined') return
 
     const root = document.documentElement
-    const theme = getThemeById(themePreset)
+    // Use custom theme if selected, otherwise lookup from presets
+    const theme = themePreset === 'custom-cloned' && customTheme
+      ? customTheme
+      : getThemeById(themePreset)
     const font = getFontById(fontFamily)
 
     // Apply color mode class
@@ -148,7 +167,7 @@ export function ThemeProvider({
     if (font) {
       root.style.setProperty('--font-sans', `var(${font.variable}), ${font.fallback}`)
     }
-  }, [themePreset, fontFamily, resolvedMode])
+  }, [themePreset, fontFamily, resolvedMode, customTheme])
 
   const updatePreferences = useCallback(
     async (updates: Partial<UserPreferences>) => {
@@ -168,6 +187,11 @@ export function ThemeProvider({
     [preferences, supabase]
   )
 
+  const setCustomTheme = useCallback((theme: ThemePreset) => {
+    setCustomThemeState(theme)
+    localStorage.setItem('custom-cloned-theme', JSON.stringify(theme))
+  }, [])
+
   return (
     <ThemeContext.Provider
       value={{
@@ -177,7 +201,9 @@ export function ThemeProvider({
         resolvedMode,
         themePreset,
         fontFamily,
+        customTheme,
         updatePreferences,
+        setCustomTheme,
       }}
     >
       {children}

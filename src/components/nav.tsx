@@ -7,13 +7,18 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/goals/new', label: 'New Goal' },
-  { href: '/settings', label: 'Settings' },
-  { href: '/settings/appearance', label: 'Appearance' },
+  { href: '/', label: 'Dashboard', guestAllowed: true },
+  { href: '/goals/new', label: 'New Goal', guestAllowed: true },
+  { href: '/settings/team', label: 'Team', guestAllowed: false },
+  { href: '/settings', label: 'Settings', guestAllowed: false },
+  { href: '/settings/appearance', label: 'Appearance', guestAllowed: false },
 ]
 
-export function Nav() {
+interface NavProps {
+  isGuest?: boolean
+}
+
+export function Nav({ isGuest = false }: NavProps) {
   const pathname = usePathname()
   const supabase = createClient()
 
@@ -21,6 +26,10 @@ export function Nav() {
     await supabase.auth.signOut()
     window.location.href = '/login'
   }
+
+  const visibleNavItems = isGuest
+    ? navItems.filter(item => item.guestAllowed)
+    : navItems
 
   return (
     <header className="border-b bg-card">
@@ -30,7 +39,7 @@ export function Nav() {
             Goal Tracker
           </Link>
           <nav className="flex items-center gap-1">
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -46,9 +55,24 @@ export function Nav() {
             ))}
           </nav>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleSignOut}>
-          Sign Out
-        </Button>
+        {isGuest ? (
+          <div className="flex gap-2">
+            <Link href="/login">
+              <Button variant="ghost" size="sm">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button size="sm">
+                Get Started
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            Sign Out
+          </Button>
+        )}
       </div>
     </header>
   )

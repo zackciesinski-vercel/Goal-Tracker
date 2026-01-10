@@ -1,19 +1,94 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme, type UserPreferences } from '@/components/theme-provider'
-import { THEME_PRESETS, FONT_OPTIONS } from '@/lib/themes'
+import { THEME_PRESETS, FONT_OPTIONS, type ThemePreset } from '@/lib/themes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 interface ThemeSettingsProps {
   initialPreferences: UserPreferences | null
 }
 
+type ExtractedTheme = ThemePreset & {
+  fonts?: string[]
+  colorsFound?: number
+}
+
 export function ThemeSettings({ initialPreferences }: ThemeSettingsProps) {
-  const { updatePreferences, themePreset, fontFamily, colorMode } = useTheme()
+  const { updatePreferences, themePreset, fontFamily, colorMode, setCustomTheme } = useTheme()
   const [saving, setSaving] = useState(false)
+  const [websiteUrl, setWebsiteUrl] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractedTheme, setExtractedTheme] = useState<ExtractedTheme | null>(null)
+  const [extractError, setExtractError] = useState<string | null>(null)
+
+  // Load any previously extracted theme from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('custom-cloned-theme')
+    if (saved) {
+      try {
+        setExtractedTheme(JSON.parse(saved))
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [])
+
+  const handleExtractTheme = async () => {
+    if (!websiteUrl) return
+
+    setExtracting(true)
+    setExtractError(null)
+
+    try {
+      const response = await fetch('/api/extract-theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: websiteUrl }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to extract theme')
+      }
+
+      const theme: ExtractedTheme = {
+        ...data.theme,
+        fonts: data.fonts,
+        colorsFound: data.colorsFound,
+      }
+
+      setExtractedTheme(theme)
+      localStorage.setItem('custom-cloned-theme', JSON.stringify(theme))
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Failed to extract theme')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  const handleApplyExtractedTheme = async () => {
+    if (!extractedTheme) return
+
+    setSaving(true)
+    // Store the custom theme and set it as active
+    setCustomTheme(extractedTheme)
+    await updatePreferences({ theme_preset: 'custom-cloned' })
+    setSaving(false)
+  }
+
+  const handleClearCustomTheme = () => {
+    setExtractedTheme(null)
+    setWebsiteUrl('')
+    localStorage.removeItem('custom-cloned-theme')
+    if (themePreset === 'custom-cloned') {
+      handleThemeChange('aurora')
+    }
+  }
 
   const handleThemeChange = async (themeId: string) => {
     setSaving(true)
@@ -60,6 +135,89 @@ export function ThemeSettings({ initialPreferences }: ThemeSettingsProps) {
               </Button>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Clone from Website */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Clone from Website</CardTitle>
+          <CardDescription>
+            Paste a URL to extract colors and style from any website
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              placeholder="https://vercel.com"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              disabled={extracting}
+              onKeyDown={(e) => e.key === 'Enter' && handleExtractTheme()}
+            />
+            <Button
+              onClick={handleExtractTheme}
+              disabled={extracting || !websiteUrl}
+            >
+              {extracting ? 'Extracting...' : 'Extract'}
+            </Button>
+          </div>
+
+          {extractError && (
+            <p className="text-sm text-destructive">{extractError}</p>
+          )}
+
+          {extractedTheme && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{extractedTheme.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {extractedTheme.colorsFound} colors extracted
+                    {extractedTheme.fonts && extractedTheme.fonts.length > 0 && (
+                      <> · Fonts: {extractedTheme.fonts.join(', ')}</>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <div
+                    className="w-8 h-8 rounded-full shadow-sm border"
+                    style={{ backgroundColor: extractedTheme.preview.primary }}
+                    title="Primary"
+                  />
+                  <div
+                    className="w-8 h-8 rounded-full shadow-sm border"
+                    style={{ backgroundColor: extractedTheme.preview.accent }}
+                    title="Accent"
+                  />
+                  <div
+                    className="w-8 h-8 rounded-full shadow-sm border"
+                    style={{ backgroundColor: extractedTheme.preview.bg }}
+                    title="Background"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleApplyExtractedTheme}
+                  disabled={saving}
+                  className="flex-1"
+                  variant={themePreset === 'custom-cloned' ? 'secondary' : 'default'}
+                >
+                  {themePreset === 'custom-cloned' ? 'Applied' : 'Apply Theme'}
+                </Button>
+                <Button
+                  onClick={handleClearCustomTheme}
+                  variant="outline"
+                  disabled={saving}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

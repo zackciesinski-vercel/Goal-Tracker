@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button'
 import { getQuarterLabel } from '@/lib/fiscal'
 
 interface LockQuarterFormProps {
+  organizationId: string
   year: number
   quarter: number
   unlockedCount: number
 }
 
-export function LockQuarterForm({ year, quarter, unlockedCount }: LockQuarterFormProps) {
+export function LockQuarterForm({ organizationId, year, quarter, unlockedCount }: LockQuarterFormProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -26,6 +27,7 @@ export function LockQuarterForm({ year, quarter, unlockedCount }: LockQuarterFor
     const { error: updateError } = await supabase
       .from('goals')
       .update({ is_locked: true })
+      .eq('organization_id', organizationId)
       .eq('year', year)
       .eq('quarter', quarter)
       .eq('is_locked', false)

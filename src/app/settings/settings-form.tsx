@@ -31,12 +31,14 @@ const months = [
 
 interface SettingsFormProps {
   settingsId?: string
+  organizationId: string
   initialFiscalMonth: number
   initialCadence: number
 }
 
 export function SettingsForm({
   settingsId,
+  organizationId,
   initialFiscalMonth,
   initialCadence,
 }: SettingsFormProps) {
@@ -69,7 +71,10 @@ export function SettingsForm({
         .update(updateData)
         .eq('id', settingsId)
     } else {
-      result = await supabase.from('org_settings').insert(updateData)
+      result = await supabase.from('org_settings').insert({
+        ...updateData,
+        organization_id: organizationId,
+      })
     }
 
     if (result.error) {

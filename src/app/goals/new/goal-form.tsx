@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { IconPicker } from '@/components/icon-picker'
 import { FiscalPeriod, getQuarterLabel } from '@/lib/fiscal'
 
@@ -31,19 +32,24 @@ interface GoalFormProps {
   fiscalStartMonth: number
   isAdmin: boolean
   companyObjectives: CompanyObjective[]
+  organizationId: string | null
+  isGuest?: boolean
 }
 
 export function GoalForm({
   availablePeriods,
   fiscalStartMonth,
   isAdmin,
-  companyObjectives
+  companyObjectives,
+  organizationId,
+  isGuest = false,
 }: GoalFormProps) {
   const router = useRouter()
   const supabase = createClient()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
 
   const [icon, setIcon] = useState('🎯')
   const [title, setTitle] = useState('')
@@ -67,6 +73,13 @@ export function GoalForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // If guest, show signup prompt instead of submitting
+    if (isGuest) {
+      setShowSignupPrompt(true)
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -87,11 +100,18 @@ export function GoalForm({
       return
     }
 
+    if (!organizationId) {
+      setError('No organization found. Please complete onboarding first.')
+      setLoading(false)
+      return
+    }
+
     const { error: insertError } = await supabase.from('goals').insert({
       icon,
       title,
       description: description || null,
       owner_id: user.id,
+      organization_id: organizationId,
       goal_type: goalType,
       parent_goal_id: needsParent ? parentGoalId : null,
       metric_name: metricName,
@@ -259,7 +279,7 @@ export function GoalForm({
           <div className="flex gap-3">
             <Button
               type="submit"
-              disabled={loading || (needsParent && filteredObjectives.length === 0)}
+              disabled={loading || (needsParent && filteredObjectives.length === 0 && !isGuest)}
             >
               {loading ? 'Creating...' : 'Create Goal'}
             </Button>
@@ -273,6 +293,38 @@ export function GoalForm({
           </div>
         </form>
       </CardContent>
+
+      {/* Signup Prompt Modal for Guests */}
+      {showSignupPrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <CardTitle>Create an Account to Save</CardTitle>
+              <CardDescription>
+                Sign up for free to save your goals and track progress with your team
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3">
+                <Link href="/login?redirect=/goals/new">
+                  <Button className="w-full" size="lg">
+                    Sign Up Free
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSignupPrompt(false)}
+                >
+                  Continue Exploring
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Already have an account? The sign up page works for both new and existing users.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </Card>
   )
 }

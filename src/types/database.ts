@@ -33,9 +33,124 @@ export type Database = {
         }
         Relationships: []
       }
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          invite_code: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          invite_code?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          invite_code?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      organization_members: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          role: 'owner' | 'admin' | 'member'
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          role?: 'owner' | 'admin' | 'member'
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          role?: 'owner' | 'admin' | 'member'
+          joined_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      invitations: {
+        Row: {
+          id: string
+          organization_id: string
+          email: string
+          token: string
+          invited_by: string | null
+          role: 'admin' | 'member'
+          status: 'pending' | 'accepted' | 'expired'
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          email: string
+          token?: string
+          invited_by?: string | null
+          role?: 'admin' | 'member'
+          status?: 'pending' | 'accepted' | 'expired'
+          expires_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          email?: string
+          token?: string
+          invited_by?: string | null
+          role?: 'admin' | 'member'
+          status?: 'pending' | 'accepted' | 'expired'
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       org_settings: {
         Row: {
           id: string
+          organization_id: string
           fiscal_year_start_month: number
           checkin_cadence_days: number
           created_at: string
@@ -43,6 +158,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          organization_id: string
           fiscal_year_start_month?: number
           checkin_cadence_days?: number
           created_at?: string
@@ -50,16 +166,26 @@ export type Database = {
         }
         Update: {
           id?: string
+          organization_id?: string
           fiscal_year_start_month?: number
           checkin_cadence_days?: number
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "org_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       goals: {
         Row: {
           id: string
+          organization_id: string
           title: string
           description: string | null
           icon: string
@@ -77,6 +203,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          organization_id: string
           title: string
           description?: string | null
           icon?: string
@@ -94,6 +221,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          organization_id?: string
           title?: string
           description?: string | null
           icon?: string
@@ -110,6 +238,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "goals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "goals_owner_id_fkey"
             columns: ["owner_id"]
@@ -207,7 +342,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_invitation: {
+        Args: {
+          invite_token: string
+        }
+        Returns: string
+      }
+      join_organization: {
+        Args: {
+          org_invite_code: string
+        }
+        Returns: string
+      }
+      get_user_organization: {
+        Args: {
+          user_uuid: string
+        }
+        Returns: string
+      }
+      is_org_admin: {
+        Args: {
+          user_uuid: string
+          org_uuid: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
@@ -220,6 +379,9 @@ export type Database = {
 
 // Helper types
 export type User = Database['public']['Tables']['users']['Row']
+export type Organization = Database['public']['Tables']['organizations']['Row']
+export type OrganizationMember = Database['public']['Tables']['organization_members']['Row']
+export type Invitation = Database['public']['Tables']['invitations']['Row']
 export type OrgSettings = Database['public']['Tables']['org_settings']['Row']
 export type Goal = Database['public']['Tables']['goals']['Row']
 export type Update = Database['public']['Tables']['updates']['Row']
@@ -234,4 +396,8 @@ export type GoalWithParent = Goal & {
   updates: Update[]
   owner: User
   parent_goal: Goal | null
+}
+
+export type OrganizationMemberWithUser = OrganizationMember & {
+  user: User
 }
