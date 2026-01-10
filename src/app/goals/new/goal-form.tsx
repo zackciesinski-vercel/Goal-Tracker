@@ -155,7 +155,7 @@ export function GoalForm({
                   <SelectItem value="individual">Individual Goal</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {goalType === 'company' && 'Set by leadership for the whole company'}
                 {goalType === 'team' && 'Set by managers for their team'}
                 {goalType === 'individual' && 'Your personal goal'}
@@ -189,7 +189,7 @@ export function GoalForm({
             <div className="space-y-2">
               <Label htmlFor="parentGoal">Supports Company Objective</Label>
               {filteredObjectives.length === 0 ? (
-                <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md">
+                <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 p-3 rounded-md">
                   No company objectives exist for {getQuarterLabel(selectedYear, selectedQuarter)} yet.
                   {isAdmin
                     ? ' Create a company objective first, then create team/individual goals.'
@@ -209,7 +209,7 @@ export function GoalForm({
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Which company objective does this goal contribute to?
               </p>
             </div>
