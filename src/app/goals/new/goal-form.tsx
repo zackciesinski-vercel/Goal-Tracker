@@ -106,7 +106,8 @@ export function GoalForm({
       return
     }
 
-    const { error: insertError } = await supabase.from('goals').insert({
+    // Company objectives don't require metrics
+    const goalData: Record<string, unknown> = {
       icon,
       title,
       description: description || null,
@@ -114,11 +115,17 @@ export function GoalForm({
       organization_id: organizationId,
       goal_type: goalType,
       parent_goal_id: needsParent ? parentGoalId : null,
-      metric_name: metricName,
-      metric_target: parseFloat(metricTarget),
       year,
       quarter,
-    })
+    }
+
+    // Only add metrics for team/individual goals
+    if (goalType !== 'company') {
+      goalData.metric_name = metricName
+      goalData.metric_target = parseFloat(metricTarget)
+    }
+
+    const { error: insertError } = await supabase.from('goals').insert(goalData)
 
     if (insertError) {
       setError(insertError.message)
@@ -245,32 +252,42 @@ export function GoalForm({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Metrics - required for team/individual goals, optional for company objectives */}
+          {goalType === 'company' ? (
             <div className="space-y-2">
-              <Label htmlFor="metricName">Metric Name</Label>
-              <Input
-                id="metricName"
-                placeholder="e.g., Partners signed"
-                value={metricName}
-                onChange={(e) => setMetricName(e.target.value)}
-                required
-              />
+              <p className="text-sm text-muted-foreground">
+                Company objectives are aspirational and don&apos;t require specific metrics.
+                Team and individual goals that support this objective will have measurable targets.
+              </p>
             </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="metricName">Metric Name</Label>
+                <Input
+                  id="metricName"
+                  placeholder="e.g., Partners signed"
+                  value={metricName}
+                  onChange={(e) => setMetricName(e.target.value)}
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="metricTarget">Target Value</Label>
-              <Input
-                id="metricTarget"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="e.g., 50"
-                value={metricTarget}
-                onChange={(e) => setMetricTarget(e.target.value)}
-                required
-              />
+              <div className="space-y-2">
+                <Label htmlFor="metricTarget">Target Value</Label>
+                <Input
+                  id="metricTarget"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g., 50"
+                  value={metricTarget}
+                  onChange={(e) => setMetricTarget(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600">{error}</p>
