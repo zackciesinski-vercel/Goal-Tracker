@@ -43,11 +43,17 @@ export function ThemeSettings({ initialPreferences }: ThemeSettingsProps) {
     setExtracting(true)
     setExtractError(null)
 
+    // Auto-add https:// if no protocol specified
+    let url = websiteUrl.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url
+    }
+
     try {
       const response = await fetch('/api/extract-theme', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: websiteUrl }),
+        body: JSON.stringify({ url }),
       })
 
       const data = await response.json()
