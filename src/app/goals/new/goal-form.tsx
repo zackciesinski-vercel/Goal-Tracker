@@ -22,7 +22,7 @@ import { FiscalPeriod, getQuarterLabel } from '@/lib/fiscal'
 interface CompanyObjective {
   id: string
   title: string
-  metric_name: string
+  metric_name: string | null
   year: number
   quarter: number
 }
@@ -107,7 +107,7 @@ export function GoalForm({
     }
 
     // Company objectives don't require metrics
-    const goalData: Record<string, unknown> = {
+    const { error: insertError } = await supabase.from('goals').insert({
       icon,
       title,
       description: description || null,
@@ -117,15 +117,10 @@ export function GoalForm({
       parent_goal_id: needsParent ? parentGoalId : null,
       year,
       quarter,
-    }
-
-    // Only add metrics for team/individual goals
-    if (goalType !== 'company') {
-      goalData.metric_name = metricName
-      goalData.metric_target = parseFloat(metricTarget)
-    }
-
-    const { error: insertError } = await supabase.from('goals').insert(goalData)
+      // Only set metrics for team/individual goals
+      metric_name: goalType === 'company' ? null : metricName,
+      metric_target: goalType === 'company' ? null : parseFloat(metricTarget),
+    })
 
     if (insertError) {
       setError(insertError.message)

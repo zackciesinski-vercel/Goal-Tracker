@@ -17,7 +17,7 @@ export default async function NewGoalPage() {
   let fiscalStartMonth = demoOrgSettings.fiscal_year_start_month
   let isAdmin = false
   let organizationId: string | null = null
-  let companyObjectives: { id: string; title: string; metric_name: string; year: number; quarter: number }[] = []
+  let companyObjectives: { id: string; title: string; metric_name: string | null; year: number; quarter: number }[] = []
 
   if (!isGuest) {
     // Get user's organization

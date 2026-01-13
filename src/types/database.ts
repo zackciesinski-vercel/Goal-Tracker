@@ -192,8 +192,8 @@ export type Database = {
           owner_id: string
           parent_goal_id: string | null
           goal_type: 'company' | 'team' | 'individual'
-          metric_name: string
-          metric_target: number
+          metric_name: string | null
+          metric_target: number | null
           metric_current: number
           year: number
           quarter: number
@@ -210,8 +210,8 @@ export type Database = {
           owner_id: string
           parent_goal_id?: string | null
           goal_type: 'company' | 'team' | 'individual'
-          metric_name: string
-          metric_target: number
+          metric_name?: string | null
+          metric_target?: number | null
           metric_current?: number
           year: number
           quarter: number
@@ -228,8 +228,8 @@ export type Database = {
           owner_id?: string
           parent_goal_id?: string | null
           goal_type?: 'company' | 'team' | 'individual'
-          metric_name?: string
-          metric_target?: number
+          metric_name?: string | null
+          metric_target?: number | null
           metric_current?: number
           year?: number
           quarter?: number

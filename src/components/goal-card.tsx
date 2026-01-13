@@ -19,9 +19,10 @@ interface GoalCardProps {
 }
 
 export function GoalCard({ goal, updates = [], checkinCadenceDays = 7 }: GoalCardProps) {
-  const progress = calculateProgress(goal.metric_current, goal.metric_target)
-  const status = getGoalStatus(goal.metric_current, goal.metric_target)
-  const overdue = isCheckinOverdue(updates, checkinCadenceDays)
+  const hasMetrics = goal.metric_target !== null
+  const progress = hasMetrics ? calculateProgress(goal.metric_current, goal.metric_target!) : 0
+  const status = hasMetrics ? getGoalStatus(goal.metric_current, goal.metric_target!) : 'on_track'
+  const overdue = hasMetrics ? isCheckinOverdue(updates, checkinCadenceDays) : false
 
   const statusColors = {
     on_track: 'text-status-on-track',
@@ -99,20 +100,29 @@ export function GoalCard({ goal, updates = [], checkinCadenceDays = 7 }: GoalCar
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-2xl font-bold ${statusColors[status]}`}>
-                  {progress}%
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {getStatusLabel(status)}
-                </span>
-              </div>
+              {hasMetrics ? (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-2xl font-bold ${statusColors[status]}`}>
+                      {progress}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {getStatusLabel(status)}
+                    </span>
+                  </div>
 
-              <div className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{formatMetric(goal.metric_current)}</span>
-                <span className="opacity-60"> / {formatMetric(goal.metric_target)} </span>
-                <span>{goal.metric_name}</span>
-              </div>
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{formatMetric(goal.metric_current)}</span>
+                    <span className="opacity-60"> / {formatMetric(goal.metric_target!)} </span>
+                    <span>{goal.metric_name}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  <Badge variant="outline" className="mb-2">Company Objective</Badge>
+                  <p className="text-xs">Strategic objective - progress tracked via supporting goals</p>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

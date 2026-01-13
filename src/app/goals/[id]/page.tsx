@@ -77,8 +77,10 @@ export default async function GoalDetailPage({ params }: PageProps) {
   const { data: { user } } = await supabase.auth.getUser()
   const isOwner = user?.id === goal.owner_id
 
-  const progress = calculateProgress(goal.metric_current, goal.metric_target)
-  const status = getGoalStatus(goal.metric_current, goal.metric_target)
+  // Company objectives may not have metrics
+  const hasMetrics = goal.metric_target !== null
+  const progress = hasMetrics ? calculateProgress(goal.metric_current, goal.metric_target!) : null
+  const status = hasMetrics ? getGoalStatus(goal.metric_current, goal.metric_target!) : null
   const overdue = isCheckinOverdue(goal.updates, checkinCadence)
 
   const statusColors = {
@@ -111,15 +113,17 @@ export default async function GoalDetailPage({ params }: PageProps) {
             </Link>
             <h1 className="text-2xl font-semibold">{goal.title}</h1>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <span className="text-gray-600">
+              <span className="text-muted-foreground">
                 {getQuarterLabel(goal.year, goal.quarter)}
               </span>
               <Badge variant="outline">
                 {goalTypeLabels[goal.goal_type as keyof typeof goalTypeLabels] || goal.goal_type}
               </Badge>
-              <Badge className={statusColors[status]} variant="secondary">
-                {getStatusLabel(status)}
-              </Badge>
+              {status && (
+                <Badge className={statusColors[status]} variant="secondary">
+                  {getStatusLabel(status)}
+                </Badge>
+              )}
               {goal.is_locked && (
                 <Badge variant="outline">Locked</Badge>
               )}
@@ -141,32 +145,46 @@ export default async function GoalDetailPage({ params }: PageProps) {
         )}
 
         {goal.description && (
-          <p className="text-gray-600">{goal.description}</p>
+          <p className="text-muted-foreground">{goal.description}</p>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{goal.metric_name}</span>
-                <span className="font-medium">
-                  {formatMetric(goal.metric_current)} / {formatMetric(goal.metric_target)}
-                </span>
+        {/* Progress card - only for goals with metrics */}
+        {hasMetrics && progress !== null && status !== null && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{goal.metric_name}</span>
+                  <span className="font-medium">
+                    {formatMetric(goal.metric_current)} / {formatMetric(goal.metric_target!)}
+                  </span>
+                </div>
+                <div className="relative">
+                  <Progress value={progress} className="h-3" />
+                  <div
+                    className={`absolute top-0 left-0 h-3 rounded-full ${progressColors[status]}`}
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground text-right">{progress}% complete</p>
               </div>
-              <div className="relative">
-                <Progress value={progress} className="h-3" />
-                <div
-                  className={`absolute top-0 left-0 h-3 rounded-full ${progressColors[status]}`}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <p className="text-sm text-gray-500 text-right">{progress}% complete</p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* For company objectives without metrics, show info */}
+        {!hasMetrics && (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                This is a company objective. Progress is measured through the team and individual goals that support it.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Child goals for company objectives */}
         {goal.goal_type === 'company' && childGoals.length > 0 && (
@@ -193,7 +211,8 @@ export default async function GoalDetailPage({ params }: PageProps) {
           </Card>
         )}
 
-        {isOwner && (
+        {/* Weekly check-in - only for goals with metrics */}
+        {isOwner && hasMetrics && goal.metric_name && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
