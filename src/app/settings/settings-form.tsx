@@ -34,6 +34,7 @@ interface SettingsFormProps {
   organizationId: string
   initialFiscalMonth: number
   initialCadence: number
+  initialSlackWebhook: string | null
 }
 
 export function SettingsForm({
@@ -41,6 +42,7 @@ export function SettingsForm({
   organizationId,
   initialFiscalMonth,
   initialCadence,
+  initialSlackWebhook,
 }: SettingsFormProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -51,6 +53,7 @@ export function SettingsForm({
 
   const [fiscalMonth, setFiscalMonth] = useState(initialFiscalMonth.toString())
   const [cadence, setCadence] = useState(initialCadence.toString())
+  const [slackWebhook, setSlackWebhook] = useState(initialSlackWebhook || '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,6 +64,7 @@ export function SettingsForm({
     const updateData = {
       fiscal_year_start_month: parseInt(fiscalMonth),
       checkin_cadence_days: parseInt(cadence),
+      slack_webhook_url: slackWebhook.trim() || null,
       updated_at: new Date().toISOString(),
     }
 
@@ -122,6 +126,20 @@ export function SettingsForm({
         />
         <p className="text-xs text-gray-500">
           How often team members should update their goals
+        </p>
+      </div>
+
+      <div className="space-y-2 pt-4 border-t">
+        <Label htmlFor="slackWebhook">Slack Webhook URL</Label>
+        <Input
+          id="slackWebhook"
+          type="url"
+          placeholder="https://hooks.slack.com/services/..."
+          value={slackWebhook}
+          onChange={(e) => setSlackWebhook(e.target.value)}
+        />
+        <p className="text-xs text-gray-500">
+          Get this from your Slack App settings → Incoming Webhooks. Used for sharing goals to Slack.
         </p>
       </div>
 

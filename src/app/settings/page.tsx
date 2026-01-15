@@ -68,6 +68,7 @@ export default async function SettingsPage() {
               organizationId={organization.id}
               initialFiscalMonth={fiscalStartMonth}
               initialCadence={checkinCadence}
+              initialSlackWebhook={settings?.slack_webhook_url ?? null}
             />
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { IconPicker } from '@/components/icon-picker'
 import { FiscalPeriod, getQuarterLabel } from '@/lib/fiscal'
+
+const GUEST_GOAL_KEY = 'guest_demo_goal'
 
 interface CompanyObjective {
   id: string
@@ -50,6 +52,15 @@ export function GoalForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+  const [hasGuestGoal, setHasGuestGoal] = useState(false)
+
+  // Check if guest already has a demo goal
+  useEffect(() => {
+    if (isGuest && typeof window !== 'undefined') {
+      const existingGoal = localStorage.getItem(GUEST_GOAL_KEY)
+      setHasGuestGoal(!!existingGoal)
+    }
+  }, [isGuest])
 
   const [icon, setIcon] = useState('🎯')
   const [title, setTitle] = useState('')
@@ -74,9 +85,41 @@ export function GoalForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // If guest, show signup prompt instead of submitting
+    // If guest, handle demo goal creation
     if (isGuest) {
-      setShowSignupPrompt(true)
+      // If guest already has a goal, show signup prompt
+      if (hasGuestGoal) {
+        setShowSignupPrompt(true)
+        return
+      }
+
+      // Validate parent selection for non-company goals
+      if (needsParent && !parentGoalId) {
+        setError('Please select a company objective that this goal supports')
+        return
+      }
+
+      // Save the demo goal to localStorage
+      const [year, quarter] = selectedPeriod.split('-').map(Number)
+      const demoGoal = {
+        id: `guest-goal-${Date.now()}`,
+        icon,
+        title,
+        description: description || null,
+        goal_type: goalType,
+        parent_goal_id: needsParent ? parentGoalId : null,
+        year,
+        quarter,
+        metric_name: goalType === 'company' ? null : metricName,
+        metric_target: goalType === 'company' ? null : parseFloat(metricTarget),
+        metric_current: 0,
+        created_at: new Date().toISOString(),
+        updates: [],
+      }
+
+      localStorage.setItem(GUEST_GOAL_KEY, JSON.stringify(demoGoal))
+      router.push('/')
+      router.refresh()
       return
     }
 

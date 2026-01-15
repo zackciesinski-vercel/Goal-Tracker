@@ -49,8 +49,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from login page
-  if (user && pathname.startsWith('/login')) {
+  // Redirect logged-in users away from login page (but not logout)
+  if (user && pathname.startsWith('/login') && !pathname.startsWith('/logout')) {
     const redirect = request.nextUrl.searchParams.get('redirect') || '/'
     const url = request.nextUrl.clone()
     url.pathname = redirect

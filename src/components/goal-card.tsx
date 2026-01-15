@@ -25,18 +25,21 @@ export function GoalCard({ goal, updates = [], checkinCadenceDays = 7 }: GoalCar
   const overdue = hasMetrics ? isCheckinOverdue(updates, checkinCadenceDays) : false
 
   const statusColors = {
+    ahead: 'text-blue-500',
     on_track: 'text-status-on-track',
     at_risk: 'text-status-at-risk',
     behind: 'text-status-behind',
   }
 
   const progressColors = {
+    ahead: 'stroke-blue-500',
     on_track: 'stroke-status-on-track',
     at_risk: 'stroke-status-at-risk',
     behind: 'stroke-status-behind',
   }
 
   const bgColors = {
+    ahead: 'bg-blue-500/10',
     on_track: 'bg-status-on-track/10',
     at_risk: 'bg-status-at-risk/10',
     behind: 'bg-status-behind/10',

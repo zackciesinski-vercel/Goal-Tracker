@@ -153,6 +153,7 @@ export type Database = {
           organization_id: string
           fiscal_year_start_month: number
           checkin_cadence_days: number
+          slack_webhook_url: string | null
           created_at: string
           updated_at: string
         }
@@ -161,6 +162,7 @@ export type Database = {
           organization_id: string
           fiscal_year_start_month?: number
           checkin_cadence_days?: number
+          slack_webhook_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -169,6 +171,7 @@ export type Database = {
           organization_id?: string
           fiscal_year_start_month?: number
           checkin_cadence_days?: number
+          slack_webhook_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -198,6 +201,7 @@ export type Database = {
           year: number
           quarter: number
           is_locked: boolean
+          status_override: 'ahead' | 'on_track' | 'at_risk' | 'behind' | null
           created_at: string
           updated_at: string
         }
@@ -216,6 +220,7 @@ export type Database = {
           year: number
           quarter: number
           is_locked?: boolean
+          status_override?: 'ahead' | 'on_track' | 'at_risk' | 'behind' | null
           created_at?: string
           updated_at?: string
         }
@@ -234,6 +239,7 @@ export type Database = {
           year?: number
           quarter?: number
           is_locked?: boolean
+          status_override?: 'ahead' | 'on_track' | 'at_risk' | 'behind' | null
           created_at?: string
           updated_at?: string
         }
@@ -337,6 +343,100 @@ export type Database = {
           }
         ]
       }
+      goal_collaborators: {
+        Row: {
+          id: string
+          goal_id: string
+          user_id: string
+          role: 'editor' | 'viewer'
+          added_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          goal_id: string
+          user_id: string
+          role?: 'editor' | 'viewer'
+          added_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          goal_id?: string
+          user_id?: string
+          role?: 'editor' | 'viewer'
+          added_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_collaborators_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_collaborators_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_collaborators_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      goal_share_links: {
+        Row: {
+          id: string
+          goal_id: string
+          token: string
+          created_by: string | null
+          expires_at: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          goal_id: string
+          token?: string
+          created_by?: string | null
+          expires_at?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          goal_id?: string
+          token?: string
+          created_by?: string | null
+          expires_at?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_share_links_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_share_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -399,5 +499,12 @@ export type GoalWithParent = Goal & {
 }
 
 export type OrganizationMemberWithUser = OrganizationMember & {
+  user: User
+}
+
+export type GoalCollaborator = Database['public']['Tables']['goal_collaborators']['Row']
+export type GoalShareLink = Database['public']['Tables']['goal_share_links']['Row']
+
+export type GoalCollaboratorWithUser = GoalCollaborator & {
   user: User
 }

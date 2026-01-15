@@ -11,9 +11,14 @@ import {
   isCheckinOverdue,
 } from '@/lib/goals'
 import { getQuarterLabel } from '@/lib/fiscal'
+import { getServerOrg } from '@/lib/org-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { CheckinForm } from './checkin-form'
+import { CollaboratorManager } from '@/components/collaborator-manager'
+import { ShareLinkManager } from '@/components/share-link-manager'
+import { DemoGoalView } from './demo-goal-view'
+import { demoCompanyObjectives, demoTeamGoals } from '@/lib/demo-data'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -27,6 +32,20 @@ const goalTypeLabels = {
 
 export default async function GoalDetailPage({ params }: PageProps) {
   const { id } = await params
+
+  // Check if this is a demo goal
+  const allDemoGoals = [...demoCompanyObjectives, ...demoTeamGoals]
+  const demoGoal = allDemoGoals.find(g => g.id === id)
+
+  if (demoGoal || id.startsWith('guest-goal-')) {
+    // Find parent for demo goals (only team goals have parent_goal_id)
+    const parentGoalId = demoGoal && 'parent_goal_id' in demoGoal ? demoGoal.parent_goal_id : null
+    const parentGoal = parentGoalId
+      ? demoCompanyObjectives.find(obj => obj.id === parentGoalId)
+      : null
+    return <DemoGoalView goalId={id} demoGoal={demoGoal} parentGoal={parentGoal} />
+  }
+
   const supabase = await createClient()
 
   // Get org settings
@@ -77,19 +96,76 @@ export default async function GoalDetailPage({ params }: PageProps) {
   const { data: { user } } = await supabase.auth.getUser()
   const isOwner = user?.id === goal.owner_id
 
+  // Get user's organization and members
+  const { organization } = await getServerOrg(supabase)
+  let orgMembers: { user_id: string; user: { id: string; name: string; email: string } }[] = []
+  if (organization) {
+    const { data } = await supabase
+      .from('organization_members')
+      .select('user_id, user:users (id, name, email)')
+      .eq('organization_id', organization.id)
+    orgMembers = (data ?? []) as { user_id: string; user: { id: string; name: string; email: string } }[]
+  }
+
+  // Get collaborators for this goal
+  const { data: collaboratorsData } = await supabase
+    .from('goal_collaborators')
+    .select('*, user:users!goal_collaborators_user_id_fkey (id, name, email)')
+    .eq('goal_id', id)
+
+  type CollaboratorWithUser = {
+    id: string
+    goal_id: string
+    user_id: string
+    role: 'editor' | 'viewer'
+    added_by: string | null
+    created_at: string
+    user: { id: string; name: string; email: string }
+  }
+  const collaborators: CollaboratorWithUser[] = (collaboratorsData ?? []) as unknown as CollaboratorWithUser[]
+
+  // Get share link for this goal (if owner)
+  let shareLink = null
+  if (isOwner) {
+    const { data } = await supabase
+      .from('goal_share_links')
+      .select('*')
+      .eq('goal_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    shareLink = data
+  }
+
+  // Check if current user is an editor collaborator
+  const isEditor = collaborators.some(c => c.user_id === user?.id && c.role === 'editor')
+  const canEdit = isOwner || isEditor
+
   // Company objectives may not have metrics
+  const fiscalStartMonth = settings?.fiscal_year_start_month ?? 2
   const hasMetrics = goal.metric_target !== null
   const progress = hasMetrics ? calculateProgress(goal.metric_current, goal.metric_target!) : null
-  const status = hasMetrics ? getGoalStatus(goal.metric_current, goal.metric_target!) : null
+  const status = hasMetrics
+    ? getGoalStatus(
+        goal.metric_current,
+        goal.metric_target!,
+        goal.year,
+        goal.quarter,
+        fiscalStartMonth,
+        goal.status_override
+      )
+    : null
   const overdue = isCheckinOverdue(goal.updates, checkinCadence)
 
   const statusColors = {
+    ahead: 'bg-blue-100 text-blue-800',
     on_track: 'bg-green-100 text-green-800',
     at_risk: 'bg-yellow-100 text-yellow-800',
     behind: 'bg-red-100 text-red-800',
   }
 
   const progressColors = {
+    ahead: 'bg-blue-500',
     on_track: 'bg-green-500',
     at_risk: 'bg-yellow-500',
     behind: 'bg-red-500',
@@ -211,8 +287,8 @@ export default async function GoalDetailPage({ params }: PageProps) {
           </Card>
         )}
 
-        {/* Weekly check-in - only for goals with metrics */}
-        {isOwner && hasMetrics && goal.metric_name && (
+        {/* Weekly check-in - only for goals with metrics, for owners or editor collaborators */}
+        {canEdit && hasMetrics && goal.metric_name && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -225,7 +301,11 @@ export default async function GoalDetailPage({ params }: PageProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <CheckinForm goalId={goal.id} metricName={goal.metric_name} />
+              <CheckinForm
+                goalId={goal.id}
+                metricName={goal.metric_name}
+                currentStatusOverride={goal.status_override}
+              />
             </CardContent>
           </Card>
         )}
@@ -270,6 +350,24 @@ export default async function GoalDetailPage({ params }: PageProps) {
         <div className="text-sm text-gray-500">
           Owner: {goal.owner?.name || goal.owner?.email}
         </div>
+
+        {/* Collaborators section */}
+        <CollaboratorManager
+          goalId={goal.id}
+          collaborators={collaborators as any}
+          orgMembers={orgMembers as any}
+          ownerId={goal.owner_id}
+          isOwner={isOwner}
+        />
+
+        {/* Share link section - only for owner */}
+        {isOwner && (
+          <ShareLinkManager
+            goalId={goal.id}
+            shareLink={shareLink}
+            isOwner={isOwner}
+          />
+        )}
       </div>
     </AppShell>
   )

@@ -4,9 +4,11 @@ import { GoalCard } from '@/components/goal-card'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { getCurrentFiscalPeriod, getQuarterLabel } from '@/lib/fiscal'
-import { calculateProgress, getGoalStatus, getStatusLabel, formatMetric } from '@/lib/goals'
+import { formatMetric } from '@/lib/goals'
 import { demoCompanyObjectives, demoTeamGoals, demoOrgSettings } from '@/lib/demo-data'
 import { GuestBanner } from '@/components/guest-banner'
+import { GuestGoalDisplay } from '@/components/guest-goal-display'
+import { ShareToSlack } from '@/components/share-to-slack'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -22,6 +24,7 @@ export default async function DashboardPage() {
   let allGoals: any[] = [...demoCompanyObjectives, ...demoTeamGoals]
   let isGuest = !user
   let hasOrg = false
+  let hasSlackWebhook = false
 
   if (user) {
     // Get user's organization - use try/catch to handle RLS errors gracefully
@@ -46,6 +49,7 @@ export default async function DashboardPage() {
         if (orgSettings) {
           fiscalStartMonth = orgSettings.fiscal_year_start_month
           checkinCadence = orgSettings.checkin_cadence_days
+          hasSlackWebhook = !!orgSettings.slack_webhook_url
         }
 
         // Get goals for this organization
@@ -85,8 +89,6 @@ export default async function DashboardPage() {
   const hasCompanyObjectives = companyObjectives.length > 0
   const hasMyGoals = myGoals.length > 0
 
-  const circumference = 2 * Math.PI * 45
-
   return (
     <AppShell isGuest={isGuest}>
       <div className="space-y-8">
@@ -97,9 +99,12 @@ export default async function DashboardPage() {
             <h1 className="text-2xl font-semibold">Dashboard</h1>
             <p className="text-muted-foreground">{getQuarterLabel(currentPeriod.year, currentPeriod.quarter)}</p>
           </div>
-          <Link href="/goals/new">
-            <Button>New Goal</Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            {!isGuest && <ShareToSlack hasWebhook={hasSlackWebhook} />}
+            <Link href="/goals/new">
+              <Button>New Goal</Button>
+            </Link>
+          </div>
         </div>
 
         {/* Company Objectives Section */}
@@ -110,100 +115,44 @@ export default async function DashboardPage() {
               <p className="text-muted-foreground">No company objectives for this quarter yet.</p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               {companyObjectives.map((objective) => {
-                const progress = calculateProgress(objective.metric_current, objective.metric_target)
-                const status = getGoalStatus(objective.metric_current, objective.metric_target)
-                const strokeDashoffset = circumference - (progress / 100) * circumference
+                const hasMetrics = objective.metric_target !== null
 
                 // Count goals that ladder up to this objective
                 const childGoals = allGoals?.filter(g => g.parent_goal_id === objective.id) ?? []
                 const childCount = childGoals.length
 
-                const statusTextColors = {
-                  on_track: 'text-status-on-track',
-                  at_risk: 'text-status-at-risk',
-                  behind: 'text-status-behind',
-                }
-
-                const progressColors = {
-                  on_track: 'stroke-status-on-track',
-                  at_risk: 'stroke-status-at-risk',
-                  behind: 'stroke-status-behind',
-                }
-
-                const bgColors = {
-                  on_track: 'bg-status-on-track/15',
-                  at_risk: 'bg-status-at-risk/15',
-                  behind: 'bg-status-behind/15',
-                }
-
                 return (
                   <Link key={objective.id} href={`/goals/${objective.id}`}>
-                    <Card className={`hover:shadow-lg transition-all cursor-pointer h-full border-0 ${bgColors[status]}`}>
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-5">
-                          {/* Large circular progress with icon */}
-                          <div className="relative flex-shrink-0">
-                            <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                              <circle
-                                cx="50"
-                                cy="50"
-                                r="45"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="6"
-                                className="text-white/60"
-                              />
-                              <circle
-                                cx="50"
-                                cy="50"
-                                r="45"
-                                fill="none"
-                                strokeWidth="6"
-                                strokeLinecap="round"
-                                className={progressColors[status]}
-                                style={{
-                                  strokeDasharray: circumference,
-                                  strokeDashoffset: strokeDashoffset,
-                                  transition: 'stroke-dashoffset 0.5s ease',
-                                }}
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              {objective.icon?.startsWith('http') ? (
-                                <img src={objective.icon} alt="" className="w-14 h-14 object-cover rounded" />
-                              ) : (
-                                <span className="text-4xl">{objective.icon || '🎯'}</span>
-                              )}
-                            </div>
+                    <Card className="hover:shadow-lg transition-all cursor-pointer h-full border-0 bg-secondary/50">
+                      <CardContent className="p-5">
+                        <div className="flex flex-col items-center text-center gap-3">
+                          {/* Icon */}
+                          <div className="w-16 h-16 rounded-full bg-background/50 flex items-center justify-center">
+                            {objective.icon?.startsWith('http') ? (
+                              <img src={objective.icon} alt="" className="w-10 h-10 object-cover rounded" />
+                            ) : (
+                              <span className="text-3xl">{objective.icon || '🎯'}</span>
+                            )}
                           </div>
 
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-foreground text-lg mb-2 line-clamp-2">
-                              {objective.title}
-                            </h3>
+                          {/* Title */}
+                          <h3 className="font-semibold text-foreground line-clamp-2 leading-tight">
+                            {objective.title}
+                          </h3>
 
-                            <div className="flex items-baseline gap-2 mb-2">
-                              <span className={`text-3xl font-bold ${statusTextColors[status]}`}>
-                                {progress}%
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {getStatusLabel(status)}
-                              </span>
-                            </div>
+                          {/* Description or supporting goals count */}
+                          <p className="text-sm text-muted-foreground">
+                            {childCount} supporting goal{childCount !== 1 ? 's' : ''}
+                          </p>
 
-                            <div className="flex items-center justify-between text-sm">
-                              <div className="text-muted-foreground">
-                                <span className="font-medium text-foreground">{formatMetric(objective.metric_current)}</span>
-                                <span className="opacity-60"> / {formatMetric(objective.metric_target)}</span>
-                              </div>
-                              <span className="text-muted-foreground">
-                                {childCount} goal{childCount !== 1 ? 's' : ''}
-                              </span>
+                          {/* Only show metrics if they exist */}
+                          {hasMetrics && (
+                            <div className="text-xs text-muted-foreground">
+                              {formatMetric(objective.metric_current)} / {formatMetric(objective.metric_target)}
                             </div>
-                          </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -270,6 +219,17 @@ export default async function DashboardPage() {
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/* Show guest's custom goal from localStorage */}
+              {isGuest && (
+                <GuestGoalDisplay
+                  companyObjectives={companyObjectives.map(obj => ({
+                    id: obj.id,
+                    title: obj.title,
+                    icon: obj.icon,
+                  }))}
+                />
               )}
             </div>
           )}
